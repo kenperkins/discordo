@@ -20,7 +20,7 @@ const (
 	qrLayerName    = "qr"
 )
 
-type DoneFn = func(token string)
+type DoneFn = func(token string) error
 
 type Form struct {
 	*layers.Layers
@@ -55,11 +55,15 @@ func (f *Form) login() {
 		return
 	}
 
-	go keyring.SetToken(token)
-
 	if f.done != nil {
-		f.done(token)
+		if err := f.done(token); err != nil {
+			f.onError(err)
+			f.form.GetFormItem(0).(*tview.InputField).SetText("")
+			return
+		}
 	}
+
+	go keyring.SetToken(token)
 }
 
 func (f *Form) onError(err error) {
@@ -115,12 +119,15 @@ func (f *Form) loginWithQR() {
 			return
 		}
 
-		go keyring.SetToken(token)
-
 		f.RemoveLayer(qrLayerName)
 		if f.done != nil {
-			f.done(token)
+			if err := f.done(token); err != nil {
+				f.onError(err)
+				return
+			}
 		}
+
+		go keyring.SetToken(token)
 	})
 
 	f.AddLayer(qr, layers.WithName(qrLayerName), layers.WithResize(true), layers.WithVisible(true))

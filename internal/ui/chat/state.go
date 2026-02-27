@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/ayn2op/discordo/internal/http"
+	"github.com/ayn2op/discordo/internal/keyring"
 	"github.com/ayn2op/discordo/internal/notifications"
 	"github.com/ayn2op/tview"
 	"github.com/diamondburned/arikawa/v3/discord"
@@ -36,6 +37,7 @@ func (v *View) OpenState(token string) error {
 
 	// Handlers
 	v.state.AddHandler(v.onRaw)
+	v.state.AddHandler(v.onClose)
 	v.state.AddHandler(v.onReady)
 	v.state.AddHandler(v.onMessageCreate)
 	v.state.AddHandler(v.onMessageUpdate)
@@ -78,6 +80,23 @@ func (v *View) onRaw(event *ws.RawEvent) {
 		"type", event.OriginalType,
 		// "data", event.Raw,
 	)
+}
+
+func (v *View) onClose(event *ws.CloseEvent) {
+	slog.Error("gateway connection closed", "code", event.Code, "err", event.Err)
+	if event.Code == 4004 {
+		v.onAuthFailure()
+	}
+}
+
+func (v *View) onAuthFailure() {
+	slog.Error("authentication failed, returning to login")
+	keyring.DeleteToken()
+	v.app.QueueUpdateDraw(func() {
+		if v.onLogout != nil {
+			v.onLogout()
+		}
+	})
 }
 
 func (v *View) onReady(event *gateway.ReadyEvent) {
