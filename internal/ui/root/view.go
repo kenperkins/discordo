@@ -75,7 +75,8 @@ func (v *View) Run() error {
 		if err := v.showChatView(token); err != nil {
 			slog.Error("failed to open session with stored token", "err", err)
 			keyring.DeleteToken()
-			v.showLoginView()
+			form := v.showLoginView()
+			form.ShowError(fmt.Errorf("saved token failed: %w", err))
 		}
 	}
 
@@ -85,7 +86,7 @@ func (v *View) Run() error {
 	return err
 }
 
-func (v *View) showLoginView() {
+func (v *View) showLoginView() *login.Form {
 	loginForm := login.NewForm(v.app, v.cfg, func(token string) error {
 		if err := v.showChatView(token); err != nil {
 			slog.Error("failed to show chat view", "err", err)
@@ -96,10 +97,11 @@ func (v *View) showLoginView() {
 	v.inner = loginForm
 	v.MarkDirty()
 	v.app.SetFocus(v)
+	return loginForm
 }
 
 func (v *View) showChatView(token string) error {
-	v.chat = chat.NewView(v.app, v.cfg, v.showLoginView)
+	v.chat = chat.NewView(v.app, v.cfg, func() { v.showLoginView() })
 	if err := v.chat.OpenState(token); err != nil {
 		return err
 	}
